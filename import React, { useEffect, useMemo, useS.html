@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Yourtown Community Resource Hub</title>
+  <style>
+    :root{
+      --bg:#f7fbff; --card:#fff; --muted:#6b7280; --accent:#2563eb; --accent-2:#7c3aed;
+      --radius:12px; --gap:16px; font-family:Inter, Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica", "Arial";
+    }
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:#0f172a;line-height:1.4;padding:28px}
+    .container{max-width:1100px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center;gap:16px}
+    h1{margin:0;font-size:28px}
+    p.lead{margin:4px 0 0;color:var(--muted)}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;background:var(--accent);color:white;text-decoration:none;border:none;cursor:pointer}
+    .btn-outline{background:transparent;border:1px solid rgba(15,23,42,0.08);color:var(--accent)}
+    .grid{display:grid;gap:var(--gap)}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px}
+    .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:0 1px 4px rgba(2,6,23,0.05)}
+    .muted{color:var(--muted);font-size:13px}
+    .small{font-size:13px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+    input[type="search"],select,input,textarea{padding:8px;border-radius:8px;border:1px solid #e6eef8;font-size:14px}
+    textarea{min-height:80px}
+    .row{display:flex;gap:12px;align-items:center}
+    aside{position:relative}
+    footer{margin-top:24px;color:var(--muted);font-size:13px}
+    .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .tag{background:#eef2ff;padding:6px 8px;border-radius:999px;font-size:13px}
+    .highlight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+    .featured{border:2px solid #eef2ff}
+    .small-note{font-size:12px;color:var(--muted)}
+    .search-result{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .result-left{max-width:72%}
+    .result-right{text-align:right;min-width:130px}
+    .events-list{display:flex;flex-direction:column;gap:8px}
+    .event{background:#fff;padding:8px;border-radius:8px;border:1px solid #f1f5f9}
+    .footer-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+    .visually-hidden{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
+    @media (max-width:900px){
+      .highlight-grid{grid-template-columns:1fr}
+      header{flex-direction:column;align-items:flex-start}
+      .result-left{max-width:100%}
+      .result-right{text-align:left;min-width:0}
+      .footer-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <header>
+      <div>
+        <h1>Yourtown Community Resource Hub</h1>
+        <p class="lead">A searchable directory of local nonprofits, support services, community programs, and events.</p>
+      </div>
+      <div class="row">
+        <button id="toggleSuggest" class="btn" aria-expanded="false">Suggest a Resource</button>
+        <button id="downloadCsv" class="btn btn-outline" title="Download all resources as CSV">Download CSV</button>
+      </div>
+    </header>
+
+    <!-- Spotlight / Highlights -->
+    <section aria-labelledby="spotlight" class="grid" style="margin-top:18px">
+      <h2 id="spotlight">Spotlight — Community Highlights</h2>
+      <div class="highlight-grid" id="highlights" aria-live="polite">
+        <!-- Filled by JS; at least 3 featured items -->
+      </div>
+    </section>
+
+    <!-- Suggest form (hidden toggled) -->
+    <section id="suggestFormSection" class="card" style="margin-top:18px;display:none;">
+      <h3>Suggest a New Resource</h3>
+      <p class="small-note">Fill out this form to suggest a resource. Submissions are saved locally for demo purposes. An admin should verify and publish changes for a live site.</p>
+      <form id="suggestForm" class="grid" style="margin-top:10px;gap:8px;">
+        <label>
+          <span class="visually-hidden">Resource name</span>
+          <input name="name" placeholder="Name (required)" required>
+        </label>
+        <label>
+          <input name="category" placeholder="Category (e.g., Health & Support) (required)" required>
+        </label>
+        <label>
+          <input name="tags" placeholder="Tags (comma separated) e.g., counseling,mental-health">
+        </label>
+        <label>
+          <input name="phone" placeholder="Phone">
+        </label>
+        <label>
+          <input name="website" placeholder="Website (include https://)">
+        </label>
+        <label style="grid-column:1/-1">
+          <input name="address" placeholder="Address (optional)">
+        </label>
+        <label style="grid-column:1/-1">
+          <textarea name="description" placeholder="Short description"></textarea>
+        </label>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button type="button" id="cancelSuggest" class="btn btn-outline">Cancel</button>
+          <button type="submit" class="btn">Submit</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Search + Directory + Right column -->
+    <section class="grid" style="grid-template-columns:2fr 1fr;gap:16px;margin-top:18px">
+      <main>
+        <div class="card" role="region" aria-label="Search and filters">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label style="flex:1">
+              <span class="visually-hidden">Search</span>
+              <input id="search" type="search" placeholder="Search by name, tag, category, or description" aria-label="Search resources">
+            </label>
+            <label>
+              <span class="visually-hidden">Category filter</span>
+              <select id="categoryFilter" aria-label="Filter by category"><option value="All">All categories</option></select>
+            </label>
+            <label>
+              <span class="visually-hidden">Tag filter</span>
+              <select id="tagFilter" aria-label="Filter by tag"><option value="">All tags</option></select>
+            </label>
+            <label>
+              <select id="sortSelect" aria-label="Sort results">
+                <option value="relevance">Sort: Relevance</option>
+                <option value="name">Sort: Name</option>
+                <option value="category">Sort: Category</option>
+              </select>
+            </label>
+            <button id="clearFilters" class="btn btn-outline">Clear</button>
+          </div>
+
+          <div style="margin-top:12px">
+            <p id="resultCount" class="muted small">0 results</p>
+            <div id="results" style="margin-top:8px;display:flex;flex-direction:column;gap:10px" aria-live="polite"></div>
+          </div>
+        </div>
+      </main>
+
+      <aside>
+        <div class="card">
+          <h3>Upcoming Events</h3>
+          <div class="events-list" id="events">
+            <!-- events injected by JS -->
+          </div>
+
+          <hr style="margin:12px 0">
+
+          <h3>Volunteer</h3>
+          <form id="volunteerForm" style="display:flex;flex-direction:column;gap:8px">
+            <input name="vname" placeholder="Your name" required>
+            <input name="vemail" placeholder="Email" required>
+            <input name="vinterests" placeholder="Interests (events, tutoring, outreach)">
+            <div style="display:flex;justify-content:flex-end"><button class="btn" type="submit">Sign Up</button></div>
+          </form>
+
+          <hr style="margin:12px 0">
+          <div>
+            <h4>Quick Links</h4>
+            <ul class="small muted">
+              <li><a href="#" onclick="alert('Crisis contacts - replace with your community list')">Crisis & Emergency Contacts</a></li>
+              <li><a href="#" onclick="document.getElementById('suggestFormSection').scrollIntoView()">How to Add a Resource</a></li>
+              <li><a href="#" onclick="alert('Privacy: demo site stores data locally only')">Privacy & Data</a></li>
+            </ul>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="card" style="margin-top:18px">
+      <div class="footer-grid">
+        <div>
+          <h4>FAQ</h4>
+          <p><strong>How do I suggest a resource?</strong> Use the Suggest a Resource button; submissions are added to the local directory for demo — an admin should verify before official publishing.</p>
+          <p><strong>Who manages the hub?</strong> This hub is maintained by the community chapter. Contact the site admin to request featured placement or updates.</p>
+        </div>
+        <div>
+          <h4>Accessibility</h4>
+          <p class="small-note">This site is built with clear headings, form labels, keyboard-focusable controls, and accessible ARIA attributes. For additional accommodations, contact the admin.</p>
+        </div>
+      </div>
+      <div style="margin-top:12px" class="muted small-note">Template created for the 2026 National TSA Conference — you may include your school or chapter name where appropriate.</div>
+    </footer>
+  </div>
+
+  <script>
+    // Seed resources — at least 3 featured items for spotlight
+    const seedResources = [
+      {
+        id: 'r1',
+        name: 'BrightFuture Food Pantry',
+        category: 'Food & Basic Needs',
+        tags: ['food','pantry','weekly'],
+        description: 'Weekly free groceries and household supplies for families in need.',
+        phone: '(555) 123-4567',
+        website: 'https://brightfuture.example.org',
+        address: '12 Community St, Yourtown',
+        hours: 'Tue & Sat 10:00 - 14:00',
+        featured: true
+      },
+      {
+        id: 'r2',
+        name: 'Neighborhood Youth Center',
+        category: 'Education & Youth',
+        tags: ['after-school','tutoring','youth'],
+        description: 'After-school programs, homework help, and sports activities.',
+        phone: '(555) 222-3333',
+        website: 'https://nyc.example.org',
+        address: '78 Park Ave, Yourtown',
+        hours: 'Mon-Fri 15:00 - 20:00',
+        featured: true
+      },
+      {
+        id: 'r3',
+        name: 'CareConnect Mental Health',
+        category: 'Health & Support',
+        tags: ['mental-health','counseling','support'],
+        description: 'Sliding-scale counseling and crisis-support referrals for residents.',
+        phone: '(555) 444-5555',
+        website: 'https://careconnect.example.org',
+        address: '200 Wellness Dr, Yourtown',
+        hours: 'By appointment',
+        featured: true
+      },
+      {
+        id: 'r4',
+        name: 'GreenSteps Job Training',
+        category: 'Employment',
+        tags: ['job-training','resume','workshops'],
+        description: 'Free job training workshops and placement support.',
+        phone: '(555) 666-7788',
+        website: 'https://greensteps.example.org',
+        address: '9 Business Ln, Yourtown',
+        hours: 'Wed 09:00 - 17:00',
+        featured: false
+      }
+    ];
+
+    // Events sample
+    const sampleEvents = [
+      { id: 'e1', title: 'Free Resume Workshop', date: '2025-11-08', host: 'GreenSteps' },
+      { id: 'e2', title: 'Community Clean-Up', date: '2025-11-15', host: 'Yourtown Council' },
+      { id: 'e3', title: 'Mental Health Info Session', date: '2025-12-01', host: 'CareConnect' }
+    ];
+
+    // Utilities
+    function $(sel){ return document.querySelector(sel) }
+    function $all(sel){ return Array.from(document.querySelectorAll(sel)) }
+
+    // Load resources from localStorage or seed
+    function loadResources(){
+      try{
+        const raw = localStorage.getItem('crh_resources_v1');
+        if(!raw) return seedResources.slice();
+        const parsed = JSON.parse(raw);
+        // in case older versions store differently, ensure tags are arrays
+        return parsed.map(r => ({...r, tags: Array.isArray(r.tags) ? r.tags : (String(r.tags||'').split(',').map(s=>s.trim()).filter(Boolean))}));
+      } catch(e){
+        console.warn('Failed to load resources, using seed.', e);
+        return seedResources.slice();
+      }
+    }
+    function saveResources(list){
+      localStorage.setItem('crh_resources_v1', JSON.stringify(list));
+    }
+
+    // Application state
+    let resources = loadResources();
+
+    // DOM elements
+    const highlightsEl = $('#highlights');
+    const resultsEl = $('#results');
+    const resultCountEl = $('#resultCount');
+    const categoryFilter = $('#categoryFilter');
+    const tagFilter = $('#tagFilter');
+    const searchInput = $('#search');
+    const sortSelect = $('#sortSelect');
+    const clearFilters = $('#clearFilters');
+    const toggleSuggest = $('#toggleSuggest');
+    const suggestFormSection = $('#suggestFormSection');
+    const suggestForm = $('#suggestForm');
+    const cancelSuggest = $('#cancelSuggest');
+    const downloadCsv = $('#downloadCsv');
+    const eventsEl = $('#events');
+    const volunteerForm = $('#volunteerForm');
+
+    // Render functions
+    function renderHighlights(){
+      const featured = resources.filter(r => r.featured).slice(0, 6);
+      // Ensure there are at least 3 highlights; if not, pick top resources
+      let pick = featured.length >= 3 ? featured : [...featured, ...resources.filter(r => !r.featured)].slice(0,3);
+      highlightsEl.innerHTML = '';
+      pick.slice(0,3).forEach(r => {
+        const div = document.createElement('article');
+        div.className = 'card featured';
+        div.innerHTML = `
+          <h4 style="margin:0">${escapeHtml(r.name)}</h4>
+          <div class="muted small" style="margin-top:4px">${escapeHtml(r.category)}</div>
+          <p style="margin-top:8px">${escapeHtml(r.description)}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <a href="${escapeAttr(r.website)}" target="_blank" rel="noreferrer" class="small">Visit site</a>
+            <div class="small muted">${escapeHtml(r.phone||'')}</div>
+          </div>
+        `;
+        highlightsEl.appendChild(div);
+      });
+    }
+
+    function renderResults(){
+      const q = String(searchInput.value||'').trim().toLowerCase();
+      const c = categoryFilter.value;
+      const t = tagFilter.value;
+      let list = resources.filter(r => {
+        if(c && c !== 'All' && r.category !== c) return false;
+        if(t && !r.tags.includes(t)) return false;
+        if(!q) return true;
+        const hay = (r.name + ' ' + r.description + ' ' + r.category + ' ' + r.tags.join(' ')).toLowerCase();
+        return hay.includes(q);
+      });
+
+      if(sortSelect.value === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
+      if(sortSelect.value === 'category') list.sort((a,b) => a.category.localeCompare(b.category));
+      if(sortSelect.value === 'relevance' && q){
+        list.sort((a,b) => {
+          const score = r => (r.name.toLowerCase().includes(q)?3:0) + (r.tags.join(' ').toLowerCase().includes(q)?2:0) + (r.description.toLowerCase().includes(q)?1:0);
+          return score(b)-score(a);
+        });
+      }
+
+      resultCountEl.textContent = `${list.length} result${list.length !== 1 ? 's':''}`;
+      resultsEl.innerHTML = '';
+      list.forEach(r => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = `
+          <div class="search-result">
+            <div class="result-left">
+              <h4 style="margin:0">${escapeHtml(r.name)}</h4>
+              <div class="muted small">${escapeHtml(r.category)} • ${r.tags.map(t=>escapeHtml(t)).join(', ')}</div>
+              <p style="margin-top:8px">${escapeHtml(r.description)}</p>
+              <div class="muted small" style="margin-top:8px">${escapeHtml(r.address)} • ${escapeHtml(r.hours)}</div>
+            </div>
+            <div class="result-right">
+              <div>${escapeHtml(r.phone)}</div>
+              <div style="margin-top:8px"><a href="${escapeAttr(r.website)}" target="_blank" rel="noreferrer">Website</a></div>
+            </div>
+          </div>
+        `;
+        resultsEl.appendChild(el);
+      });
+    }
+
+    function renderFilters(){
+      // categories
+      const cats = Array.from(new Set(['All',...resources.map(r => r.category)]));
+      categoryFilter.innerHTML = '';
+      cats.forEach(c => {
+        const o = document.createElement('option'); o.value = c; o.textContent = c; categoryFilter.appendChild(o);
+      });
+      // tags
+      const tagSet = new Set();
+      resources.forEach(r => r.tags.forEach(t => t && tagSet.add(t)));
+      tagFilter.innerHTML = '<option value="">All tags</option>';
+      Array.from(tagSet).sort().forEach(t => {
+        const o = document.createElement('option'); o.value = t; o.textContent = t; tagFilter.appendChild(o);
+      });
+    }
+
+    function renderEvents(){
+      eventsEl.innerHTML = '';
+      sampleEvents.forEach(ev => {
+        const d = document.createElement('div'); d.className = 'event';
+        d.innerHTML = `<div style="font-weight:600">${escapeHtml(ev.title)}</div><div class="muted small">${escapeHtml(ev.date)} • ${escapeHtml(ev.host)}</div>`;
+        eventsEl.appendChild(d);
+      });
+    }
+
+    // CSV export
+    function exportCSV(){
+      const rows = [
+        ['Name','Category','Tags','Description','Phone','Website','Address','Hours']
+      ];
+      resources.forEach(r => {
+        rows.push([r.name, r.category, r.tags.join(';'), r.description, r.phone, r.website, r.address, r.hours]);
+      });
+      const csv = rows.map(row => row.map(cell => `"${String(cell||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'community-resources.csv'; a.style.display='none';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // Suggest form handling
+    function wireSuggestForm(){
+      toggleSuggest.addEventListener('click', () => {
+        const open = suggestFormSection.style.display !== 'none';
+        suggestFormSection.style.display = open ? 'none' : 'block';
+        toggleSuggest.setAttribute('aria-expanded', String(!open));
+        if(!open) scrollIntoViewSmooth(suggestFormSection);
+      });
+      cancelSuggest.addEventListener('click', () => {
+        suggestForm.reset();
+        suggestFormSection.style.display = 'none';
+        toggleSuggest.setAttribute('aria-expanded', 'false');
+      });
+
+      suggestForm.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const f = new FormData(suggestForm);
+        const r = {
+          id: 'r_' + Date.now(),
+          name: (f.get('name')||'').toString().trim(),
+          category: (f.get('category')||'').toString().trim(),
+          tags: (f.get('tags')||'').toString().split(',').map(s=>s.trim()).filter(Boolean),
+          description: (f.get('description')||'').toString().trim(),
+          phone: (f.get('phone')||'').toString().trim(),
+          website: (f.get('website')||'').toString().trim(),
+          address: (f.get('address')||'').toString().trim(),
+          hours: '',
+          featured: false
+        };
+        if(!r.name || !r.category){
+          alert('Please enter at least a name and category.');
+          return;
+        }
+        resources.unshift(r);
+        saveResources(resources);
+        renderFilters();
+        renderHighlights();
+        renderResults();
+        suggestForm.reset();
+        suggestFormSection.style.display = 'none';
+        toggleSuggest.setAttribute('aria-expanded', 'false');
+        alert('Thanks — the new resource has been added to the local directory. Contact an admin to publish.');
+      });
+    }
+
+    // Volunteer form handling
+    function wireVolunteerForm(){
+      volunteerForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = new FormData(volunteerForm);
+        const entry = { id: 'v_' + Date.now(), name: f.get('vname'), email: f.get('vemail'), interests: f.get('vinterests') };
+        const list = JSON.parse(localStorage.getItem('crh_volunteers_v1') || '[]');
+        list.push(entry);
+        localStorage.setItem('crh_volunteers_v1', JSON.stringify(list));
+        volunteerForm.reset();
+        alert('Thanks — volunteer interest recorded locally.');
+      });
+    }
+
+    // Helper: escape html for text content
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escapeAttr(s){ if(!s) return '#'; return String(s).replace(/"/g, '&quot;'); }
+
+    function scrollIntoViewSmooth(el){ el.scrollIntoView({behavior:'smooth', block:'center'}); }
+
+    // Wire up filter and search events
+    function wireControls(){
+      [searchInput, categoryFilter, tagFilter, sortSelect].forEach(node => node.addEventListener('input', renderResults));
+      clearFilters.addEventListener('click', () => {
+        searchInput.value=''; categoryFilter.value='All'; tagFilter.value=''; sortSelect.value='relevance'; renderResults();
+      });
+      downloadCsv.addEventListener('click', exportCSV);
+    }
+
+    // Init app
+    function init(){
+      renderFilters();
+      renderHighlights();
+      renderResults();
+      renderEvents();
+      wireSuggestForm();
+      wireControls();
+      wireVolunteerForm();
+
+      // keyboard: focus search on '/'
+      window.addEventListener('keydown', e => {
+        if(e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA'){
+          e.preventDefault(); searchInput.focus();
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
