@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community Resource Hub</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:20px; background:#f5f5f5; color:#111; }
+  h1,h2,h3,h4 { margin:0 0 8px 0; }
+  .container { max-width:900px; margin:0 auto; }
+  .card { background:#fff; padding:12px; margin-bottom:12px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+  .highlight { border:2px solid #ccc; }
+  input, select, textarea, button { padding:6px; margin:4px 0; width:100%; box-sizing:border-box; }
+  button { cursor:pointer; background:#333; color:#fff; border:none; border-radius:4px; }
+  .flex { display:flex; gap:8px; flex-wrap:wrap; }
+  .flex > * { flex:1; }
+  .tags { font-size:12px; color:#555; }
+  a { color:#0066cc; text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  label { font-weight:bold; font-size:14px; display:block; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Community Resource Hub</h1>
+  <p>A searchable directory of local community resources.</p>
+
+  <!-- Spotlight -->
+  <section>
+    <h2>Spotlight Resources</h2>
+    <div id="highlights" class="flex">
+      <!-- JS will populate 3 highlighted resources -->
+    </div>
+  </section>
+
+  <!-- Suggest Form -->
+  <section class="card" style="display:none;" id="suggestFormSection">
+    <h3>Suggest a New Resource</h3>
+    <form id="suggestForm">
+      <label>Name (required)<input name="name" required></label>
+      <label>Category (required)<input name="category" required></label>
+      <label>Tags (comma separated)<input name="tags"></label>
+      <label>Phone<input name="phone"></label>
+      <label>Website<input name="website"></label>
+      <label>Address<textarea name="address"></textarea></label>
+      <label>Description<textarea name="description"></textarea></label>
+      <div class="flex">
+        <button type="button" id="cancelSuggest">Cancel</button>
+        <button type="submit">Submit</button>
+      </div>
+    </form>
+  </section>
+  <button id="toggleSuggest">Suggest a Resource</button>
+
+  <!-- Search & Filters -->
+  <section class="card">
+    <h3>Search Resources</h3>
+    <input type="search" id="search" placeholder="Search by name, category, tags, description">
+    <div class="flex">
+      <select id="categoryFilter"><option value="All">All Categories</option></select>
+      <select id="tagFilter"><option value="">All Tags</option></select>
+      <select id="sortSelect">
+        <option value="relevance">Sort: Relevance</option>
+        <option value="name">Sort: Name</option>
+        <option value="category">Sort: Category</option>
+      </select>
+    </div>
+    <button id="clearFilters">Clear Filters</button>
+    <p id="resultCount">0 results</p>
+    <div id="results"></div>
+  </section>
+
+  <!-- Events -->
+  <section class="card">
+    <h3>Upcoming Events</h3>
+    <div id="events"></div>
+  </section>
+</div>
+
+<script>
+const seedResources = [
+  {id:'r1',name:'BrightFuture Food Pantry',category:'Food',tags:['food','pantry'],description:'Free groceries weekly.',phone:'555-123',website:'https://brightfuture.example.org',address:'12 Community St',featured:true},
+  {id:'r2',name:'Neighborhood Youth Center',category:'Education',tags:['youth','tutoring'],description:'After-school programs and sports.',phone:'555-222',website:'https://nyc.example.org',address:'78 Park Ave',featured:true},
+  {id:'r3',name:'CareConnect Mental Health',category:'Health',tags:['counseling','mental-health'],description:'Counseling and crisis support.',phone:'555-444',website:'https://careconnect.example.org',address:'200 Wellness Dr',featured:true},
+  {id:'r4',name:'GreenSteps Job Training',category:'Employment',tags:['jobs','training'],description:'Job workshops and placement.',phone:'555-666',website:'https://greensteps.example.org',address:'9 Business Ln',featured:false}
+];
+const sampleEvents = [
+  {title:'Resume Workshop',date:'2025-11-08',host:'GreenSteps'},
+  {title:'Community Clean-Up',date:'2025-11-15',host:'Yourtown Council'},
+  {title:'Mental Health Info Session',date:'2025-12-01',host:'CareConnect'}
+];
+
+let resources = JSON.parse(localStorage.getItem('crh_resources')||'null') || seedResources;
+
+function saveResources(){ localStorage.setItem('crh_resources',JSON.stringify(resources)); }
+
+function renderHighlights(){
+  const highlights = resources.filter(r=>r.featured).slice(0,3);
+  const container = document.getElementById('highlights');
+  container.innerHTML='';
+  highlights.forEach(r=>{
+    const div=document.createElement('div');
+    div.className='card highlight';
+    div.innerHTML=`<h4>${r.name}</h4><div class="tags">${r.category} • ${r.tags.join(', ')}</div><p>${r.description}</p><a href="${r.website}" target="_blank">Website</a>`;
+    container.appendChild(div);
+  });
+}
+
+function renderFilters(){
+  const catSet = new Set(resources.map(r=>r.category));
+  const tagSet = new Set(resources.flatMap(r=>r.tags));
+  const catSel=document.getElementById('categoryFilter');
+  const tagSel=document.getElementById('tagFilter');
+  catSel.innerHTML='<option value="All">All Categories</option>'; tagSet.clear;
+  catSet.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o); });
+  tagSel.innerHTML='<option value="">All Tags</option>';
+  tagSet.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; tagSel.appendChild(o); });
+}
+
+function renderResults(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const c=document.getElementById('categoryFilter').value;
+  const t=document.getElementById('tagFilter').value;
+  let list = resources.filter(r=>{
+    if(c!=='All'&&r.category!==c) return false;
+    if(t&&(!r.tags.includes(t))) return false;
+    if(!q) return true;
+    return (r.name+r.description+r.category+r.tags.join(' ')).toLowerCase().includes(q);
+  });
+  const sort=document.getElementById('sortSelect').value;
+  if(sort==='name') list.sort((a,b)=>a.name.localeCompare(b.name));
+  if(sort==='category') list.sort((a,b)=>a.category.localeCompare(b.category));
+  document.getElementById('resultCount').textContent=`${list.length} result${list.length!==1?'s':''}`;
+  const container=document.getElementById('results'); container.innerHTML='';
+  list.forEach(r=>{
+    const div=document.createElement('div'); div.className='card';
+    div.innerHTML=`<h4>${r.name}</h4><div class="tags">${r.category} • ${r.tags.join(', ')}</div><p>${r.description}</p><div>${r.phone} • <a href="${r.website}" target="_blank">Website</a></div>`;
+    container.appendChild(div);
+  });
+}
+
+function renderEvents(){
+  const container=document.getElementById('events'); container.innerHTML='';
+  sampleEvents.forEach(ev=>{
+    const div=document.createElement('div'); div.className='card';
+    div.innerHTML=`<strong>${ev.title}</strong><div>${ev.date} • ${ev.host}</div>`;
+    container.appendChild(div);
+  });
+}
+
+// Suggest form
+document.getElementById('toggleSuggest').addEventListener('click',()=>{
+  const s=document.getElementById('suggestFormSection');
+  s.style.display=s.style.display==='none'?'block':'none';
+});
+document.getElementById('cancelSuggest').addEventListener('click',()=>{ document.getElementById('suggestFormSection').style.display='none'; });
+document.getElementById('suggestForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const f=new FormData(e.target);
+  const r={id:'r'+Date.now(),name:f.get('name'),category:f.get('category'),tags:(f.get('tags')||'').split(',').map(s=>s.trim()),description:f.get('description'),phone:f.get('phone'),website:f.get('website'),address:f.get('address'),featured:false};
+  if(!r.name||!r.category){ alert('Enter name and category'); return; }
+  resources.unshift(r); saveResources(); renderFilters(); renderResults(); renderHighlights(); e.target.reset(); alert('Resource added locally');
+});
+
+// Filters
+['search','categoryFilter','tagFilter','sortSelect'].forEach(id=>document.getElementById(id).addEventListener('input',renderResults));
+document.getElementById('clearFilters').addEventListener('click',()=>{ document.getElementById('search').value=''; document.getElementById('categoryFilter').value='All'; document.getElementById('tagFilter').value=''; document.getElementById('sortSelect').value='relevance'; renderResults(); });
+
+// Initialize
+renderHighlights(); renderFilters(); renderResults(); renderEvents();
+</script>
+</body>
+</html>
